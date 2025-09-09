@@ -1,10 +1,15 @@
-﻿using Dalamud.Game.Command;
+using Dalamud.Bindings.ImGui;
+using Dalamud.Game.Command;
+using Dalamud.Game.Gui;
+using Dalamud.Game.Text;
+using Dalamud.Interface.ImGuiNotification;
+using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
-using System.IO;
-using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
 using SamplePlugin.Windows;
+using System.IO;
+using Lumina.Excel.Sheets;
 
 namespace SamplePlugin;
 
@@ -16,8 +21,12 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IClientState ClientState { get; private set; } = null!;
     [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
+    [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
+    [PluginService] internal static IToastGui ToastGui { get; private set; } = null!;
 
-    private const string CommandName = "/pmycommand";
+    private const string CommandName = "/openmenu";
+    private const string CommandName2 = "/helloworld";
+
 
     public Configuration Configuration { get; init; }
 
@@ -41,6 +50,11 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
             HelpMessage = "A useful message to display in /xlhelp"
+        });
+
+        CommandManager.AddHandler(CommandName2, new CommandInfo(OnCommand)
+        {
+            HelpMessage = "Say Hello World and show current zone"
         });
 
         // Tell the UI system that we want our windows to be drawn throught he window system
@@ -76,8 +90,37 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnCommand(string command, string args)
     {
-        // In response to the slash command, toggle the display status of our main ui
-        MainWindow.Toggle();
+
+        switch (command)
+        {
+            case CommandName:
+                // In response to the slash command, toggle the display status of our main ui
+                MainWindow.Toggle();
+                break;
+            case CommandName2:
+                var territoryId = Plugin.ClientState.TerritoryType;
+                if (Plugin.DataManager.GetExcelSheet<TerritoryType>().TryGetRow(territoryId, out var territoryRow))
+                {
+                    var zoneName = territoryRow.PlaceName.Value.Name.ToString();
+
+                    // Print to chat
+                    ChatGui.Print(new XivChatEntry
+                    {
+                        Message = $"Hello World! You are in: {zoneName}",
+                        Type = XivChatType.SystemMessage
+                    });
+                    // Toast notification
+                    ToastGui.ShowQuest($"Hello World! You are in: {zoneName}");
+                }
+                else
+                {
+                    ToastGui.ShowQuest($"Hello World! You are not in a valid zone.");
+                }
+                break;
+            default:
+                break;
+        }
+
     }
     
     public void ToggleConfigUi() => ConfigWindow.Toggle();
